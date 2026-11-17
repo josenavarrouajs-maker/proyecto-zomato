@@ -15,25 +15,40 @@ st.write(
     "entrenados en Google Colab sobre `dataset_zomato_numerico`."
 )
 
+BASE_DIR = Path(__file__).resolve().parent
+
 
 @st.cache_resource
 def cargar_modelos():
     cargados = {}
-    archivos = {
-        "Random Forest": "modelo_rf.joblib",
-        "KNN (k=10)": "modelo_knn.joblib",
-        "Regresión Lineal": "modelo_lr.joblib",
+    rutas_posibles = {
+        "Random Forest": [
+            BASE_DIR / "modelos entrenados" / "modelo_rf.joblib",
+            BASE_DIR / "modelo_rf.joblib",
+        ],
+        "KNN (k=10)": [
+            BASE_DIR / "modelos entrenados" / "modelo_knn.joblib",
+            BASE_DIR / "modelo_knn.joblib",
+        ],
+        "Regresión Lineal": [
+            BASE_DIR / "modelos entrenados" / "modelo_lr.joblib",
+            BASE_DIR / "modelo_lr.joblib",
+        ],
     }
-    for nombre, archivo in archivos.items():
-        if Path(archivo).exists():
-            cargados[nombre] = joblib.load(archivo)
+    for nombre, candidatos in rutas_posibles.items():
+        for ruta in candidatos:
+            if ruta.exists():
+                cargados[nombre] = joblib.load(ruta)
+                break
     return cargados
 
 
 modelos = cargar_modelos()
 
 if not modelos:
-    st.error("No se encontraron los archivos `.joblib` junto a `app.py`.")
+    st.error(
+        "No se encontraron los archivos `.joblib` en `modelos entrenados/` ni junto a `app.py`."
+    )
     st.stop()
 
 st.sidebar.header("Configuración")
@@ -128,15 +143,15 @@ entrada = pd.DataFrame([{
     "city": city,
 }])
 
-if st.button("Predecir calificación", type="primary"):
-    pred = float(modelos[modelo_elegido].predict(entrada)[0])
-    st.success(f"Predicción con **{modelo_elegido}**: **{pred:.2f}**")
+st.subheader("Resultados en vivo")
+pred_principal = float(modelos[modelo_elegido].predict(entrada)[0])
+st.success(f"Predicción en vivo con **{modelo_elegido}**: **{pred_principal:.2f}**")
 
-    resumen_modelos = pd.DataFrame([
-        {"Modelo": nombre, "Predicción": round(float(mod.predict(entrada)[0]), 2)}
-        for nombre, mod in modelos.items()
-    ])
-    st.table(resumen_modelos)
+resumen_modelos = pd.DataFrame([
+    {"Modelo": nombre, "Predicción en vivo": round(float(mod.predict(entrada)[0]), 2)}
+    for nombre, mod in modelos.items()
+])
+st.dataframe(resumen_modelos, hide_index=True, use_container_width=True)
 
 with st.expander("10 ejemplos del conjunto de prueba (real vs. predicción)"):
     ejemplos = pd.DataFrame({
