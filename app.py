@@ -143,9 +143,15 @@ entrada = pd.DataFrame([{
     "city": city,
 }])
 
+calcular = st.button("Calcular", type="primary")
+
 st.subheader("Resultados en vivo")
 pred_principal = float(modelos[modelo_elegido].predict(entrada)[0])
-st.success(f"Predicción en vivo con **{modelo_elegido}**: **{pred_principal:.2f}**")
+
+if calcular:
+    st.success(f"Calculado con **{modelo_elegido}**: **{pred_principal:.2f}**")
+else:
+    st.info(f"Predicción en vivo con **{modelo_elegido}**: **{pred_principal:.2f}**")
 
 resumen_modelos = pd.DataFrame([
     {"Modelo": nombre, "Predicción en vivo": round(float(mod.predict(entrada)[0]), 2)}
