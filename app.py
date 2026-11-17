@@ -1,5 +1,6 @@
 from pathlib import Path
 import joblib
+import numpy as np
 import pandas as pd
 import streamlit as st
 
@@ -51,17 +52,25 @@ if not modelos:
     )
     st.stop()
 
+ejemplos_prueba = pd.DataFrame({
+    "Fila": list(range(10)),
+    "Real": [4.10, 3.80, 4.60, 4.00, 3.60, 4.20, 3.80, 3.90, 3.10, 4.30],
+    "Regresión Lineal": [4.01, 3.78, 4.33, 3.91, 3.60, 3.87, 3.71, 3.92, 3.82, 3.86],
+    "KNN (k=10)": [3.83, 3.46, 4.30, 3.81, 3.41, 3.89, 3.66, 3.48, 3.98, 3.93],
+    "Random Forest": [4.06, 3.71, 4.59, 4.14, 3.55, 4.06, 3.80, 3.74, 3.51, 4.20],
+})
+
 st.sidebar.header("Configuración")
 modelo_elegido = st.sidebar.selectbox("Modelo principal:", list(modelos.keys()))
 
-st.sidebar.subheader("Métricas en prueba (Colab)")
-metricas_df = pd.DataFrame({
-    "Modelo": ["Random Forest", "KNN (k=10)", "Regresión Lineal", "Línea base"],
-    "RMSE": [0.1553, 0.3121, 0.3280, 0.4372],
-    "MAE": [0.0869, 0.2257, 0.2350, 0.3486],
-    "R²": [0.8738, 0.4903, 0.4370, -0.0001],
-})
-st.sidebar.dataframe(metricas_df, hide_index=True, use_container_width=True)
+st.sidebar.subheader("Calificación real para métrica en vivo")
+calificacion_real_ref = st.sidebar.number_input(
+    "Calificación real de referencia (rate)",
+    min_value=0.0,
+    max_value=5.0,
+    value=4.00,
+    step=0.10,
+)
 
 st.subheader("Datos del restaurante")
 c1, c2, c3 = st.columns(3)
@@ -153,21 +162,39 @@ if calcular:
 else:
     st.info(f"Predicción en vivo con **{modelo_elegido}**: **{pred_principal:.2f}**")
 
-resumen_modelos = pd.DataFrame([
-    {"Modelo": nombre, "Predicción en vivo": round(float(mod.predict(entrada)[0]), 2)}
-    for nombre, mod in modelos.items()
-])
+filas_resumen = []
+filas_metricas_vivo = []
+
+for nombre, mod in modelos.items():
+    pred_val = float(mod.predict(entrada)[0])
+    error_abs = abs(calificacion_real_ref - pred_val)
+    error_cuad = (calificacion_real_ref - pred_val) ** 2
+    filas_resumen.append({
+        "Modelo": nombre,
+        "Predicción en vivo": round(pred_val, 2),
+        "Error abs (MAE en vivo)": round(error_abs, 4),
+    })
+    filas_metricas_vivo.append({
+        "Modelo": nombre,
+        "RMSE vivo": round(float(np.sqrt(error_cuad)), 4),
+        "MAE vivo": round(error_abs, 4),
+        "Predicción": round(pred_val, 4),
+    })
+
+resumen_modelos = pd.DataFrame(filas_resumen)
 st.dataframe(resumen_modelos, hide_index=True, use_container_width=True)
 
+st.sidebar.subheader("Métricas en vivo (vs. Real)")
+metricas_vivo_df = pd.DataFrame(filas_metricas_vivo)
+st.sidebar.data_editor(
+    metricas_vivo_df,
+    hide_index=True,
+    use_container_width=True,
+    key="metricas_en_vivo_editor",
+)
+
 with st.expander("10 ejemplos del conjunto de prueba (real vs. predicción)"):
-    ejemplos = pd.DataFrame({
-        "Fila": list(range(10)),
-        "Real": [4.10, 3.80, 4.60, 4.00, 3.60, 4.20, 3.80, 3.90, 3.10, 4.30],
-        "Regresión Lineal": [4.01, 3.78, 4.33, 3.91, 3.60, 3.87, 3.71, 3.92, 3.82, 3.86],
-        "KNN (k=10)": [3.83, 3.46, 4.30, 3.81, 3.41, 3.89, 3.66, 3.48, 3.98, 3.93],
-        "Random Forest": [4.06, 3.71, 4.59, 4.14, 3.55, 4.06, 3.80, 3.74, 3.51, 4.20],
-    })
-    st.dataframe(ejemplos, hide_index=True, use_container_width=True)
+    st.dataframe(ejemplos_prueba, hide_index=True, use_container_width=True)
 
 with st.expander("Importancia de variables (Random Forest)"):
     importancia = pd.DataFrame({
